@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.dao.OrderDelayTrackingMapper">
+  <resultMap id="BaseResultMap" type="com.example.demo.entity.OrderDelayTracking">
+    <id column="tracking_id" jdbcType="BIGINT" property="trackingId" />
+    <result column="order_id" jdbcType="BIGINT" property="orderId" />
+    <result column="order_delay_type" jdbcType="VARCHAR" property="orderDelayType" />
+    <result column="delay_days" jdbcType="INTEGER" property="delayDays" />
+    <result column="oper_type" jdbcType="VARCHAR" property="operType" />
+    <result column="created_by" jdbcType="VARCHAR" property="createdBy" />
+    <result column="created_when" jdbcType="TIMESTAMP" property="createdWhen" />
+  </resultMap>
+  <sql id="Base_Column_List">
+    tracking_id, order_id, order_delay_type, delay_days, oper_type, created_by, created_when
+  </sql>
+  <select id="getByOrderId" resultMap="BaseResultMap" parameterType="java.lang.Long" >
+    select 
+    <include refid="Base_Column_List" />
+	from order_delay_tracking
+    where order_id = #{orderId,jdbcType=BIGINT}
+    order by created_when
+  </select>
+
+  <insert id="insert" parameterType="com.example.demo.entity.OrderDelayTracking">
+    insert into order_delay_tracking (tracking_id, order_id, order_delay_type,
+      delay_days, oper_type, created_by, created_when
+      )
+    values (#{trackingId,jdbcType=BIGINT}, #{orderId,jdbcType=BIGINT}, #{orderDelayType,jdbcType=VARCHAR},
+      #{delayDays,jdbcType=INTEGER}, #{operType,jdbcType=VARCHAR}, #{createdBy,jdbcType=VARCHAR}, #{createdWhen,jdbcType=TIMESTAMP}
+      )
+  </insert>
+
+</mapper>
