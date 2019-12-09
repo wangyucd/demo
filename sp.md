@@ -60,7 +60,63 @@ ApplicationListener 的实现类，11个监听器
 
 ~~~
 
+public ConfigurableApplicationContext run(String... args) {
+		StopWatch stopWatch = new StopWatch();
+		stopWatch.start();
+		ConfigurableApplicationContext context = null;
+		Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
+		configureHeadlessProperty();
+		
+		//实际获取的是工厂类
+		//org.springframework.boot.SpringApplicationRunListener=\
+        //org.springframework.boot.context.event.EventPublishingRunListener
+        
+        //EventPublishingRunListener 持有构造器节点的11个ApplicationListener
+        //SpringApplicationRunListeners 持有SpringApplicationRunListener列表，且提供处理方法循环调用
+		SpringApplicationRunListeners listeners = getRunListeners(args);
+		//广播事件 ApplicationStartingEvent
+		具体实现：AbstractApplicationEventMulticaster#supportsEvent(org.springframework.context.ApplicationListener<?>, org.springframework.core.ResolvableType, java.lang.Class<?>)
+		
+		首先匹配的是LoggingApplicationListener 
+		BackgroundPreinitializer
+		DelegatingApplicationListener
+		LiquibaseServiceLocatorApplicationListener
 
+		
+		
+		listeners.starting();
+		try {
+			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+			ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
+			configureIgnoreBeanInfo(environment);
+			Banner printedBanner = printBanner(environment);
+			context = createApplicationContext();
+			exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
+					new Class[] { ConfigurableApplicationContext.class }, context);
+			prepareContext(context, environment, listeners, applicationArguments, printedBanner);
+			refreshContext(context);
+			afterRefresh(context, applicationArguments);
+			stopWatch.stop();
+			if (this.logStartupInfo) {
+				new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), stopWatch);
+			}
+			listeners.started(context);
+			callRunners(context, applicationArguments);
+		}
+		catch (Throwable ex) {
+			handleRunFailure(context, ex, exceptionReporters, listeners);
+			throw new IllegalStateException(ex);
+		}
+
+		try {
+			listeners.running(context);
+		}
+		catch (Throwable ex) {
+			handleRunFailure(context, ex, exceptionReporters, null);
+			throw new IllegalStateException(ex);
+		}
+		return context;
+	}
 ~~~
 
 
