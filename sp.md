@@ -65,24 +65,7 @@ public ConfigurableApplicationContext run(String... args) {
 		stopWatch.start();
 		ConfigurableApplicationContext context = null;
 		Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
-		configureHeadlessProperty();
-		
-		//实际获取的是工厂类
-		//org.springframework.boot.SpringApplicationRunListener=\
-        //org.springframework.boot.context.event.EventPublishingRunListener
-        
-        //EventPublishingRunListener 持有构造器节点的11个ApplicationListener
-        //SpringApplicationRunListeners 持有SpringApplicationRunListener列表，且提供处理方法循环调用
-		SpringApplicationRunListeners listeners = getRunListeners(args);
-		//广播事件 ApplicationStartingEvent
-		具体实现：AbstractApplicationEventMulticaster#supportsEvent(org.springframework.context.ApplicationListener<?>, org.springframework.core.ResolvableType, java.lang.Class<?>)
-		
-		首先匹配的是LoggingApplicationListener 
-		BackgroundPreinitializer
-		DelegatingApplicationListener
-		LiquibaseServiceLocatorApplicationListener
-
-		
+		configureHeadlessProperty();		
 		
 		listeners.starting();
 		try {
@@ -120,6 +103,78 @@ public ConfigurableApplicationContext run(String... args) {
 ~~~
 
 
+
+  2.1 	listeners.starting();
+
+~~~
+		实际获取的是工厂类
+		org.springframework.boot.SpringApplicationRunListener=\
+        org.springframework.boot.context.event.EventPublishingRunListener
+       
+        EventPublishingRunListener 持有构造器节点的11个ApplicationListener
+        SpringApplicationRunListeners 持有SpringApplicationRunListener列表，且提供处理方法循环调用
+		SpringApplicationRunListeners listeners = getRunListeners(args);
+		广播事件 ApplicationStartingEvent
+		具体实现：AbstractApplicationEventMulticaster#supportsEvent(org.springframework.context.ApplicationListener<?>, org.springframework.core.ResolvableType, java.lang.Class<?>)
+		
+		首先匹配的是
+		1.LoggingApplicationListener 
+		由于默认依赖logback，实际执行org.springframework.boot.logging.logback.LogbackLoggingSystem#beforeInitialize
+		
+		2.BackgroundPreinitializer
+		对于一些耗时的任务使用一个后台线程尽早触发它们开始执行初始化
+		
+			runSafely(new ConversionServiceInitializer());
+			runSafely(new ValidationInitializer());
+			runSafely(new MessageConverterInitializer());
+			runSafely(new JacksonInitializer());
+			runSafely(new CharsetInitializer());
+					
+		
+		3.DelegatingApplicationListener
+		监听应用事件，并将这些应用事件广播给环境属性context.listener.classes指定的那些监听器(较优雅，不用添加spring.factories)。
+		
+		4.LiquibaseServiceLocatorApplicationListener
+		
+		如果存在liquibase.servicelocator.ServiceLocator）
+        则使用springboot相关的版本进行替代
+		
+
+		执行方法：org.springframework.context.event.SimpleApplicationEventMulticaster#invokeListener
+		实际是执行：
+		org.springframework.context.ApplicationListener#onApplicationEvent
+		
+~~~
+
+
+
+  2.2 org.springframework.boot.SpringApplication#prepareEnvironment
+
+~~~
+	//get StandardServletEnvironment
+	先调用StandardServletEnvironment 
+	再调用StandardEnvironment 获取getSystemProperties，getSystemEnvironment
+	
+	ConfigurableEnvironment environment = getOrCreateEnvironment();
+	//初始化ConversionService
+	configureEnvironment(environment, applicationArguments.getSourceArgs());
+	ConfigurationPropertySources.attach(environment);
+	listeners.environmentPrepared(environment);
+	bindToSpringApplication(environment);
+	if (!this.isCustomEnvironment) {
+		environment = new EnvironmentConverter(getClassLoader()).convertEnvironmentIfNecessary(environment,
+	deduceEnvironmentClass());
+	}
+	ConfigurationPropertySources.attach(environment);
+~~~
+
+
+
+​    2.2.1  listeners.environmentPrepared(environment); 环境准备事件触发
+
+~~~
+[org.springframework.boot.context.config.ConfigFileApplicationListener@5158b42f, org.springframework.boot.context.config.AnsiOutputApplicationListener@595b007d, org.springframework.boot.context.logging.LoggingApplicationListener@72d1ad2e, org.springframework.boot.context.logging.ClasspathLoggingApplicationListener@2d7275fc, org.springframework.boot.autoconfigure.BackgroundPreinitializer@399f45b1, org.springframework.boot.context.config.DelegatingApplicationListener@38c6f217, org.springframework.boot.context.FileEncodingApplicationListener@3a93b025]
+~~~
 
 
 
