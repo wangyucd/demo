@@ -247,8 +247,32 @@ spring.mandatory-file-encoding和系统属性file.encoding匹配，不一致则�
 2.4 context = createApplicationContext();
 
 ```
+根据应用类型，实例化对应的context
+org.springframework.context.annotation.AnnotationConfigApplicationContext
+org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext
+org.springframework.boot.web.reactive.context.AnnotationConfigReactiveWebServerApplicationContext
+```
+
+
+
+2.5  exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,      new Class[] { ConfigurableApplicationContext.class }, context);
+
+~~~
+org.springframework.boot.SpringBootExceptionReporter=\
+org.springframework.boot.diagnostics.FailureAnalyzers
+~~~
+
+2.6  private void prepareContext 准备context
 
 ```
+context.getBeanFactory().setConversionService(ApplicationConversionService.getSharedInstance());
+实际来源于
+new ApplicationConversionService()
+
+applyInitializers(ConfigurableApplicationContext context) 应用7个初始化器
+```
+
+
 
 
 
