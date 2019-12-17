@@ -12,6 +12,7 @@ import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.aop.ThrowsAdvice;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
+import org.springframework.stereotype.Component;
 
 /**
  * ClassName: MyAspect
@@ -21,6 +22,7 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
  */
 @Slf4j
 @Aspect
+@Component
 public class MyAspect {
 
     @Pointcut("execution(public * com.example.demo.controller.*.*(..))")
@@ -30,23 +32,23 @@ public class MyAspect {
 
     @Before("controller()")
     public void before(JoinPoint jp) {
-        log.info("before,{}", jp);
+        log.debug("before,{}", jp);
 
     }
 
     @After("controller()")
     public void after(JoinPoint jp) {
-        log.info("before,{}", jp);
+        log.debug("before,{}", jp);
     }
 
     @AfterReturning(pointcut = "controller()", returning = "ret")
     public void afterReturning(Object ret) {
-        log.info("afterReturning,{}", ret);
+        log.debug("afterReturning,{}", ret);
     }
 
     @AfterThrowing(pointcut = "controller()", throwing = "throwable")
     public void afterThrowing(JoinPoint jp, Throwable throwable) {
-        log.info("afterThrowing,{},throwing:{}", jp, throwable);
+        log.debug("afterThrowing,{},throwing:{}", jp, throwable);
     }
 
     @Around("controller()")
