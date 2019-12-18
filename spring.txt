@@ -1,0 +1,51 @@
+核心方法：org.springframework.context.support.AbstractApplicationContext#refresh
+
+1. prepareRefresh(); 准备刷新的上下文
+  1.1 initPropertySources() 初始化属性资源
+  1.2 getEnvironment().validateRequiredProperties(); 验证必须属性
+
+2. ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();告诉子类刷新bean工厂
+  2.1 this.beanFactory.setSerializationId(getId());
+  2.2 getBeanFactory()获取bean工厂
+
+3. prepareBeanFactory(beanFactory);准备bean工厂
+  3.1 beanFactory.setBeanExpressionResolver(new StandardBeanExpressionResolver(beanFactory.getBeanClassLoader())); 设置spel表达式解析器
+  3.2 beanFactory.addPropertyEditorRegistrar(new ResourceEditorRegistrar(this, getEnvironment())); 设置属性编辑注册器
+  3.3 添加BeanPostProcessor[ApplicationContextAwareProcessor]
+  主要用于实现了Aware子接口[EnvironmentAware,EmbeddedValueResolverAware,ResourceLoaderAware,ApplicationEventPublisherAware,MessageSourceAware,ApplicationContextAware]的类，初始化前调用aware对应接口方法。
+  3.4 对以上6个aware接口忽略依赖。
+  3.5 注册科解析的依赖[BeanFactory,ResourceLoader,ApplicationEventPublisher,ApplicationContext]
+  3.6 添加BeanPostProcessor[ApplicationListenerDetector]
+  用于在bean初始化后，如果是ApplicationListener的实现类，添加到applicationContext中
+  
+  3.7 如果容器中存在loadTimeWeaver[类加载期织入,是在字节码加载到jvm之前，非运行时aspectj的aop织入],则添加LoadTimeWeaverAwareProcessor 以及 类加载器 ContextTypeMatchClassLoader
+  
+  3.8 registerSingleton 注册单例bean[environment[ConfigurableEnvironment],systemProperties[Map<String,Object>],systemEnvironment[Map<String,Object>]]
+  
+4. postProcessBeanFactory(beanFactory); 允许子类自定义beanFoctory的后置处理逻辑
+
+   以web应用为例，会调用org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#postProcessBeanFactory
+     添加BeanPostProcessor[WebApplicationContextServletContextAwareProcessor],postProcessBeforeInitialization初始化前设置ServletContext，ServletConfig
+	 忽略ServletContextAware依赖接口
+	 
+5. invokeBeanFactoryPostProcessors(beanFactory); 调用注册的bean factroy processor
+   5.1 实现接口BeanFactoryPostProcessor的bean，执行postProcessBeanDefinitionRegistry方法，添加bean定义后，添加到registryProcessors
+       [org.springframework.boot.autoconfigure.SharedMetadataReaderFactoryContextInitializer$CachingMetadataReaderFactoryPostProcessor@6b9ce1bf, 
+        org.springframework.boot.context.ConfigurationWarningsApplicationContextInitializer$ConfigurationWarningsPostProcessor@61884cb1]
+       实现子接口BeanDefinitionRegistryPostProcessor的bean，添加到regularPostProcessors
+	   [org.springframework.boot.context.config.ConfigFileApplicationListener.PropertySourceOrderingPostProcessor#PropertySourceOrderingPostProcessor]
+	   
+   5.2 对容器中的BeanDefinitionRegistryPostProcessor依次获取，PriorityOrdered, Ordered, and the rest
+   进行排序，且执行invokeBeanDefinitionRegistryPostProcessors.
+   5.2.1 PriorityOrdered 排序后 ConfigurationClassPostProcessor，执行ConfigurationClassPostProcessor#postProcessBeanDefinitionRegistry
+   对配置类进行处理，主要调用方法：org.springframework.context.annotation.ConfigurationClassParser#doProcessConfigurationClass
+   
+   --beanFactory.getBean(ppName, BeanDefinitionRegistryPostProcessor.class) 包含了创建bean的逻辑，前提是已经放入了bd.
+   由此引出了注入bean的三种方式,具体解析的时机是处理ConfigurationClassPostProcessor
+             1.@Import(要导入到容器中的组件)；容器中就会自动注册这个组件，id默认是全类名
+             2.ImportSelector:返回需要导入的组件的全类名数组；
+             3.ImportBeanDefinitionRegistrar:手动注册bean到容器中
+			 
+   5.2.2 Ordered的实现处理
+   5.2.3 其他 [org.mybatis.spring.mapper.MapperScannerConfigurer mybatis集成
+  
