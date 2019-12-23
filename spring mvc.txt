@@ -1,0 +1,145 @@
+1.容器启动阶段：
+
+核心方法：
+org.springframework.web.servlet.FrameworkServlet#initWebApplicationContext
+->org.springframework.web.servlet.DispatcherServlet#onRefresh
+
+protected void initStrategies(ApplicationContext context) {
+        //附件上传解析器
+		initMultipartResolver(context);
+		//时区格式化解析器
+		initLocaleResolver(context);
+		//主题解析器
+		initThemeResolver(context);
+		initHandlerMappings(context);
+		-> 
+			0 = {RequestMappingHandlerMapping@6613} 
+			1 = {BeanNameUrlHandlerMapping@6617} 
+			2 = {RouterFunctionMapping@6619} 
+			3 = {SimpleUrlHandlerMapping@6621} 
+			4 = {WelcomePageHandlerMapping@6615} 
+			
+	        从applicationcontext中获取：Map<String, HandlerMapping> matchingBeans =
+					BeanFactoryUtils.beansOfTypeIncludingAncestors(context, HandlerMapping.class, true, false);
+					
+
+		initHandlerAdapters(context);
+		->
+		    0 = {RequestMappingHandlerAdapter@6722} 
+			1 = {HandlerFunctionAdapter@6723} 
+			2 = {HttpRequestHandlerAdapter@6724} 
+			3 = {SimpleControllerHandlerAdapter@6725} 
+			
+			从applicationcontext中获取：Map<String, HandlerAdapter> matchingBeans =
+					BeanFactoryUtils.beansOfTypeIncludingAncestors(context, HandlerAdapter.class, true, false);
+			
+
+		initHandlerExceptionResolvers(context);
+		->
+		    0 = {DefaultErrorAttributes@8647} 
+			1 = {HandlerExceptionResolverComposite@8649} 
+			->  0 = {ExceptionHandlerExceptionResolver@8665} 
+				1 = {ResponseStatusExceptionResolver@8666} 
+				2 = {DefaultHandlerExceptionResolver@8667} 
+
+		initRequestToViewNameTranslator(context);
+		initViewResolvers(context);
+		->  0 = {ContentNegotiatingViewResolver@6177} 
+		    ->  0 = {BeanNameViewResolver@6174} 
+				1 = {ViewResolverComposite@6175} 
+				2 = {InternalResourceViewResolver@6176} 
+			1 = {BeanNameViewResolver@6174} 
+			2 = {ViewResolverComposite@6175} 
+			3 = {InternalResourceViewResolver@6176} 
+
+		initFlashMapManager(context);
+	}
+
+2 请求执行阶段
+org.apache.catalina.core.StandardWrapperValve#invoke
+
+ 2.1 -> org.apache.catalina.core.ApplicationFilterChain#internalDoFilter
+
+
+	拦截器1：OrderedCharacterEncodingFilter extends CharacterEncodingFilter,CharacterEncodingFilter entends OncePerRequestFilter。
+	通过HttpEncodingAutoConfiguration注入
+	先执行 OncePerRequestFilter#doFilter，再执行抽象方法doFilterInternal的具体实现CharacterEncodingFilter#doFilterInternal
+
+	拦截器2：OrderedFormContentFilter entends OncePerRequestFilter，   DELETE,PUT和PATCH这三种HTTP method分析其FORM表单参数，将其暴露为Servlet请求参数。
+
+	拦截器3：OrderedRequestContextFilter  entends OncePerRequestFilter， 将request，response封装成ServletRequestAttributes对象，RequestContextHolder持有。
+	
+	拦截器4：WsFilter，主要是websocket的场景
+	  如果endpoint registered for the requested path. Let the
+	  UpgradeUtil.doUpgrade(sc, req, resp, mappingResult.getConfig(),
+                mappingResult.getPathParams());
+				
+  2.2 -> org.springframework.web.servlet.FrameworkServlet#service
+      javax.servlet.http.HttpServlet#service(javax.servlet.http.HttpServletRequest, javax.servlet.http.HttpServletResponse)
+	  实际执行
+	  org.springframework.web.servlet.FrameworkServlet#processRequest
+	  
+	  asyncManager.registerCallableInterceptor(FrameworkServlet.class.getName(), new RequestBindingInterceptor());
+	  
+	  最终调用的方法：
+	  org.springframework.web.servlet.DispatcherServlet#doService
+	  
+	  2.2.1 WebUtils.isIncludeRequest(request)... 判断后的处理主要是针对 <jsp:incluede page="xxx.jsp"/>
+	  
+	  2.2.2 doDispatch(request, response);
+	  
+	  
+	  2.2.2.1  HandlerExecutionChain mappedHandler = getHandler(processedRequest);
+	           -> 先调用抽象类方法：AbstractHandlerMapping#getHandler
+			     -> RequestMappingHandlerMapping#getHandlerInternal
+				   -> AbstractHandlerMethodMapping#getHandlerInternal
+				   
+				   没有匹配到，则执行org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping#handleNoMatch
+				   
+				   
+				   以请求 R( /actuator/health) 为例，通过SimpleUrlHandlerMapping处理，先执行AbstractUrlHandlerMapping#getHandlerInternal
+                   找到对应处理器 ResourceHttpRequestHandler，在AbstractUrlHandlerMapping#buildPathExposingHandler添加拦截器PathExposingHandlerInterceptor，
+				   返回HandlerExecutionChain[包含多个HandlerInterceptor]。
+				   
+				   0 = {ConversionServiceExposingInterceptor@7580} 
+				   1 = {ResourceUrlProviderExposingInterceptor@7588} 
+				   
+				   构建后的HandlerExecutionChain 包含3个HandlerInterceptor
+	  2.2.2.2 HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler()); mappedHandler.getHandler()上面的例子为ResourceHttpRequestHandler	 
+              当前被HttpRequestHandlerAdapter匹配到
+
+      2.2.2.3 执行HandlerExecutionChain#applyPreHandle	
+          if (!interceptor.preHandle(request, response, this.handler)) {
+				triggerAfterCompletion(request, response, null);
+				return false;
+		  }	  
+		  
+		  ->  先是跨域拦截器处理，AbstractHandlerMapping.CorsInterceptor#preHandle
+		  
+		  ->  AbstractUrlHandlerMapping.PathExposingHandlerInterceptor#preHandle,设置属性
+		  
+		  ->  ConversionServiceExposingInterceptor#preHandle 设置conversionService[WebConversionService]
+		  
+		  ->  ResourceUrlProviderExposingInterceptor#preHandle 设置resourceUrlProvider
+		  
+      2.2.2.4 实际执行handler方法
+	      mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+		  调用 
+		  HandlerAdapter#handle
+		  HandlerAdapter的实现接口包括：HandlerFunctionAdapter HttpRequestHandlerAdapter  RequestMappingHandlerAdapter(->AbstractHandlerMethodAdapter)  SimpleControllerHandlerAdapter  SimpleServletHandlerAdapter
+		  
+		  
+		  
+		  
+		  
+		  
+		  
+		  
+		  
+		  
+		  
+		  
+		  
+		  
+		  
+				  
