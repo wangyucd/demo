@@ -25,34 +25,35 @@ import org.springframework.stereotype.Component;
 @Component
 public class MyAspect {
 
-    @Pointcut("execution(public * com.example.demo.controller.*.*(..))")
+    @Pointcut("execution(public * com.example.demo.aop.controller.*.*(..))")
     public void controller() {
 
     }
 
     @Before("controller()")
     public void before(JoinPoint jp) {
-        log.debug("before,{}", jp);
+        log.debug("myAop before,{}", jp);
 
     }
 
     @After("controller()")
     public void after(JoinPoint jp) {
-        log.debug("before,{}", jp);
+        log.debug("myAop after,{}", jp);
     }
 
     @AfterReturning(pointcut = "controller()", returning = "ret")
     public void afterReturning(Object ret) {
-        log.debug("afterReturning,{}", ret);
+        log.debug("myAop afterReturning,{}", ret);
     }
 
     @AfterThrowing(pointcut = "controller()", throwing = "throwable")
     public void afterThrowing(JoinPoint jp, Throwable throwable) {
-        log.debug("afterThrowing,{},throwing:{}", jp, throwable);
+        log.debug("myAop afterThrowing,{},throwing:{}", jp, throwable);
     }
 
     @Around("controller()")
     public Object around(ProceedingJoinPoint pjp) {
+        log.debug("myAop around,{}", pjp);
         try {
             Object o = pjp.proceed();
             return o;

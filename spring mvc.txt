@@ -97,7 +97,7 @@ org.apache.catalina.core.StandardWrapperValve#invoke
 				   没有匹配到，则执行org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping#handleNoMatch
 				   
 				   
-				   以请求 R( /actuator/health) 为例，通过SimpleUrlHandlerMapping处理，先执行AbstractUrlHandlerMapping#getHandlerInternal
+				   1.以请求 R( /actuator/health) 为例，通过SimpleUrlHandlerMapping处理，先执行AbstractUrlHandlerMapping#getHandlerInternal
                    找到对应处理器 ResourceHttpRequestHandler，在AbstractUrlHandlerMapping#buildPathExposingHandler添加拦截器PathExposingHandlerInterceptor，
 				   返回HandlerExecutionChain[包含多个HandlerInterceptor]。
 				   
@@ -105,8 +105,20 @@ org.apache.catalina.core.StandardWrapperValve#invoke
 				   1 = {ResourceUrlProviderExposingInterceptor@7588} 
 				   
 				   构建后的HandlerExecutionChain 包含3个HandlerInterceptor
-	  2.2.2.2 HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler()); mappedHandler.getHandler()上面的例子为ResourceHttpRequestHandler	 
-              当前被HttpRequestHandlerAdapter匹配到
+				   
+				   2.以请求 R( /get) 为例，通过RequestMappingHandlerMapping处理，先执行AbstractHandlerMapping#getHandlerInternal
+                   找到对应处理器HandlerMethod，
+				   返回HandlerExecutionChain[包含多个HandlerInterceptor]。
+				   
+				   0 = {ConversionServiceExposingInterceptor@7580} 
+				   1 = {ResourceUrlProviderExposingInterceptor@7588} 
+				   
+				   构建后的HandlerExecutionChain 包含2个HandlerInterceptor
+				   
+	  2.2.2.2 HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler()); mappedHandler.getHandler()
+	  
+			  ResourceHttpRequestHandler	 被HttpRequestHandlerAdapter匹配
+			  RequestMappingHandlerMapping   被RequestMappingHandlerAdapter匹配
 
       2.2.2.3 执行HandlerExecutionChain#applyPreHandle	
           if (!interceptor.preHandle(request, response, this.handler)) {
@@ -127,6 +139,87 @@ org.apache.catalina.core.StandardWrapperValve#invoke
 		  调用 
 		  HandlerAdapter#handle
 		  HandlerAdapter的实现接口包括：HandlerFunctionAdapter HttpRequestHandlerAdapter  RequestMappingHandlerAdapter(->AbstractHandlerMethodAdapter)  SimpleControllerHandlerAdapter  SimpleServletHandlerAdapter
+		  
+		  2.2.2.4.1  HttpRequestHandlerAdapter处理请求/actuator/health，不返回ModelAndView
+		             -> org.springframework.web.servlet.resource.ResourceHttpRequestHandler#handleRequest
+					 
+		  2.2.2.4.2  RequestMappingHandlerAdapter处理正常请求，返回ModelAndView
+		             -> org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter#handleInternal
+					   -> org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter#invokeHandlerMethod
+					   
+					    ->设置参数解析器 invocableMethod.setHandlerMethodArgumentResolvers(this.argumentResolvers); 包括
+						  
+						    0 = {RequestParamMethodArgumentResolver@7260} 
+							1 = {RequestParamMapMethodArgumentResolver@7261} 
+							2 = {PathVariableMethodArgumentResolver@7262} 
+							3 = {PathVariableMapMethodArgumentResolver@7263} 
+							4 = {MatrixVariableMethodArgumentResolver@7264} 
+							5 = {MatrixVariableMapMethodArgumentResolver@7265} 
+							6 = {ServletModelAttributeMethodProcessor@7266} 
+							7 = {RequestResponseBodyMethodProcessor@7267} 
+							8 = {RequestPartMethodArgumentResolver@7268} 
+							9 = {RequestHeaderMethodArgumentResolver@7269} 
+							10 = {RequestHeaderMapMethodArgumentResolver@7270} 
+							11 = {ServletCookieValueMethodArgumentResolver@7271} 
+							12 = {ExpressionValueMethodArgumentResolver@7272} 
+							13 = {SessionAttributeMethodArgumentResolver@7273} 
+							14 = {RequestAttributeMethodArgumentResolver@7274} 
+							15 = {ServletRequestMethodArgumentResolver@7275} 
+							16 = {ServletResponseMethodArgumentResolver@7276} 
+							17 = {HttpEntityMethodProcessor@7277} 
+							18 = {RedirectAttributesMethodArgumentResolver@7278} 
+							19 = {ModelMethodProcessor@7279} 
+							20 = {MapMethodProcessor@7280} 
+							21 = {ErrorsMethodArgumentResolver@7281} 
+							22 = {SessionStatusMethodArgumentResolver@7282} 
+							23 = {UriComponentsBuilderMethodArgumentResolver@7283} 
+							24 = {RequestParamMethodArgumentResolver@7284} 
+							25 = {ServletModelAttributeMethodProcessor@7285} 
+
+                        -> 设置返回值解析器 invocableMethod.setHandlerMethodReturnValueHandlers(this.returnValueHandlers);
+						
+						    0 = {ModelAndViewMethodReturnValueHandler@7302} 
+							1 = {ModelMethodProcessor@7303} 
+							2 = {ViewMethodReturnValueHandler@7304} 
+							3 = {ResponseBodyEmitterReturnValueHandler@7305} 
+							4 = {StreamingResponseBodyReturnValueHandler@7306} 
+							5 = {HttpEntityMethodProcessor@7307} 
+							6 = {HttpHeadersReturnValueHandler@7308} 
+							7 = {CallableMethodReturnValueHandler@7309} 
+							8 = {DeferredResultMethodReturnValueHandler@7310} 
+							9 = {AsyncTaskMethodReturnValueHandler@7311} 
+							10 = {ModelAttributeMethodProcessor@7312} 
+							11 = {RequestResponseBodyMethodProcessor@7313} 
+							12 = {ViewNameMethodReturnValueHandler@7314} 
+							13 = {MapMethodProcessor@7315} 
+							14 = {ModelAttributeMethodProcessor@7316} 
+					
+                        ServletInvocableHandlerMethod
+                 
+				 調用handlerMethod方法
+				 org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter#invokeHandlerMethod
+				 
+				 -> invocableMethod.invokeAndHandle(webRequest, mavContainer);
+				   -> org.springframework.web.method.support.InvocableHandlerMethod#invokeForRequest
+				     -> org.springframework.web.method.support.InvocableHandlerMethod#doInvoke
+					   -> org.springframework.aop.framework.CglibAopProxy.DynamicAdvisedInterceptor#intercept
+					   
+					    -> 获取aop chain列表，List<Object> chain = this.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
+						-> 创建方法调用 retVal = new CglibMethodInvocation(proxy, target, method, args, targetClass, chain, methodProxy).proceed();
+						  -> org.springframework.aop.framework.ReflectiveMethodInvocation#proceed
+						    -> org.springframework.aop.aspectj.AbstractAspectJAdvice#invokeAdviceMethodWithGivenArgs
+					 
+      2.2.2.5 Apply postHandle methods of registered interceptors.
+	          mappedHandler.applyPostHandle(processedRequest, response, mv);
+			  
+			  
+	  2.2.2.6 org.springframework.web.servlet.DispatcherServlet#processDispatchResult
+	          
+	          mappedHandler.triggerAfterCompletion(request, response, null);
+			  
+	  2.2.2.7 发布请求处理事件
+	   org.springframework.web.servlet.FrameworkServlet#publishRequestHandledEvent  (ServletRequestHandledEvent)
+	   ->org.springframework.context.support.AbstractApplicationContext#publishEvent(java.lang.Object, org.springframework.core.ResolvableType)
 		  
 		  
 		  

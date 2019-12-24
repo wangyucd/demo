@@ -20,6 +20,7 @@ public class TestController {
 
     @RequestMapping("get")
     public String get() {
+        int a=1;
         return orderDelayTrackingMapper.getByOrderId(271L).size() + "";
     }
 
